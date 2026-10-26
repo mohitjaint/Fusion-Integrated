@@ -1,17 +1,21 @@
 from django.db import models
-from django.contrib.auth import get_user_model
 
-User = get_user_model()
+from core.db.mixins import TimeStampedModel, UserScopedModel
 
-class LeaveBalance(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+class LeaveBalance(TimeStampedModel, UserScopedModel):
     leave_type = models.CharField(max_length=10)  # CL, RH, SCL, EL, VL, COL
     balance = models.IntegerField(default=0)
 
-    def __str__(self):
-        return f"{self.user} - {self.leave_type}: {self.balance}"
+    class Meta:
+        db_table = "elm_leave_balance"
+        unique_together = ("user_id", "leave_type")
 
-class LeaveApplication(models.Model):
+    def __str__(self) -> str:
+        return f"User {self.user_id} - {self.leave_type}: {self.balance}"
+
+
+class LeaveApplication(TimeStampedModel, UserScopedModel):
     STATUS_CHOICES = (
         ("PENDING", "Pending"),
         ("APPROVED", "Approved"),
@@ -19,36 +23,66 @@ class LeaveApplication(models.Model):
         ("CANCELLED", "Cancelled"),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
     leave_type = models.CharField(max_length=10)
     start_date = models.DateField()
     end_date = models.DateField()
     reason = models.TextField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING")
-    substitute = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="substitute_for")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+    station_leave = models.BooleanField(default=False)
+    substitute_user_id = models.IntegerField(null=True, blank=True)
+    reviewed_by_user_id = models.IntegerField(null=True, blank=True)
+    review_remarks = models.TextField(blank=True, default="")
 
-    def __str__(self):
-        return f"{self.user} - {self.leave_type} ({self.status})"
+    class Meta:
+        db_table = "elm_leave_application"
+        ordering = ["-created_at"]
 
-class SubstituteRequest(models.Model):
-    leave_application = models.OneToOneField(LeaveApplication, on_delete=models.CASCADE)
-    substitute = models.ForeignKey(User, on_delete=models.CASCADE)
-    approved = models.BooleanField(default=False)
+    def __str__(self) -> str:
+        return f"Leave #{self.pk} (User {self.user_id}) - {self.leave_type} [{self.status}]"
 
-    def __str__(self):
-        return f"{self.leave_application} - {self.substitute} ({self.approved})"
 
-class HolidayCalendar(models.Model):
+class SubstituteRequest(TimeStampedModel):
+    STATUS_CHOICES = (
+        ("PENDING", "Pending"),
+        ("ACCEPTED", "Accepted"),
+        ("REJECTED", "Rejected"),
+    )
+
+    leave_application = models.OneToOneField(
+        LeaveApplication,
+        on_delete=models.CASCADE,
+        related_name="substitute_request",
+    )
+    substitute_user_id = models.IntegerField(db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+
+    class Meta:
+        db_table = "elm_substitute_request"
+
+    def __str__(self) -> str:
+        return f"Substitute for Leave #{self.leave_application_id} - User {self.substitute_user_id}"
+
+
+class HolidayCalendar(TimeStampedModel):
     date = models.DateField(unique=True)
     description = models.CharField(max_length=255)
     is_rh = models.BooleanField(default=False)
 
-    def __str__(self):
-        return f"{self.date}: {self.description}"
+    class Meta:
+        db_table = "elm_holiday_calendar"
+        ordering = ["date"]
 
-class LeavePolicy(models.Model):
-    leave_type = models.CharField(max_length=10)  # CL, RH, SCL, EL, VL, COL
+    def __str__(self) -> str:
+        return f"{self.date}: {self.description}{' (RH)' if self.is_rh else ''}"
+
+
+class LeavePolicy(TimeStampedModel):
+    leave_type = models.CharField(max_length=10, unique=True)
     max_days = models.IntegerField()
+    description = models.CharField(max_length=255, blank=True, default="")
 
-    def __str__(self):
-        return f"{self.leave_type}: {self.max_days}"
+    class Meta:
+        db_table = "elm_leave_policy"
+
+    def __str__(self) -> str:
+        return f"{self.leave_type}: {self.max_days} days"
