@@ -52,6 +52,13 @@
           "elm.leave.review",
           "elm.leave.view_self"
         ],
+        "faculty": [
+          "elm.balance.view",
+          "elm.holiday.view",
+          "elm.leave.cancel",
+          "elm.leave.create",
+          "elm.leave.view_self"
+        ],
         "placement_chairman": [
           "elm.balance.view",
           "elm.holiday.view",
@@ -75,6 +82,13 @@
           "elm.leave.review",
           "elm.leave.view_self"
         ],
+        "staff": [
+          "elm.balance.view",
+          "elm.holiday.view",
+          "elm.leave.cancel",
+          "elm.leave.create",
+          "elm.leave.view_self"
+        ],
         "student": [
           "elm.balance.view",
           "elm.holiday.view",
@@ -86,9 +100,11 @@
       "module_grants": [
         "Dean Academic",
         "acadadmin",
+        "faculty",
         "placement_chairman",
         "placement_coordinator",
         "placement_officer",
+        "staff",
         "student"
       ],
       "nav": {

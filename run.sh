@@ -95,6 +95,16 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
+# Sync IAM permissions from Fusion-Integrated manifest before starting
+echo -e "${CYAN}Syncing IAM permissions from permissions manifest...${NC}"
+(
+    cd "$ADMIN_DIR"
+    export DJANGO_SETTINGS_MODULE="backend.settings"
+    export DEBUG="True"
+    export SECURE_SSL_REDIRECT="False"
+    "$ADMIN_PY" manage.py seed_iam_permissions --manifest "$ROOT_DIR/registry/permissions.json" >/dev/null 2>&1 || true
+)
+
 # 1. Start IAM Backend (explicitly with backend.settings, DEBUG=True, and SECURE_SSL_REDIRECT=False)
 echo -e "${CYAN}Starting IAM Backend on 127.0.0.1:8001...${NC}"
 (

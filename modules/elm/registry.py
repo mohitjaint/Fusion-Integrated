@@ -71,6 +71,8 @@ _REVIEWER = [
 
 ROLE_GRANTS = {
     "student": _APPLICANT,
+    "faculty": _APPLICANT,
+    "staff": _APPLICANT,
     "placement_coordinator": _APPLICANT,
     "placement_officer": _REVIEWER,
     "placement_chairman": _REVIEWER,
