@@ -13,3 +13,4 @@ export const routes: RouteObject[] = [
   { path: "approvals", element: <LeaveApprovalsPage /> },
   { path: "holidays", element: <HolidayCalendarPage /> },
 ];
+

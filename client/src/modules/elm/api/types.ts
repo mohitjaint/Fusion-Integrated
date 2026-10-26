@@ -47,3 +47,4 @@ export interface Holiday {
   description: string;
   is_rh: boolean;
 }
+

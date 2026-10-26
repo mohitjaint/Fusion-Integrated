@@ -30,3 +30,4 @@ def get_substitute_requests(user_id: int) -> QuerySet[SubstituteRequest]:
         .select_related("leave_application")
         .order_by("-created_at")
     )
+
