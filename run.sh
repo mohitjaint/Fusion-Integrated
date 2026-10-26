@@ -9,8 +9,15 @@
 
 set -m # Enable job control so background processes get their own process group
 
+# Ensure unbuffered output for Python so piped logs appear in real time
+export PYTHONUNBUFFERED=1
+
 # Default service token if not already set in environment
 export TOKEN="${TOKEN:-fsvc_IokeDbMHN--rewd_g7gZPkLpD3MiwIZrPJsRKLR6jdY}"
+
+# Force DEBUG=True and SECURE_SSL_REDIRECT=False so local dev runs over plain HTTP without SSL redirects
+export DEBUG="True"
+export SECURE_SSL_REDIRECT="False"
 
 # Colors
 CYAN='\033[0;36m'
@@ -30,7 +37,7 @@ CLIENT_DIR="$ROOT_DIR/client"
 echo -e "${BOLD}======================================================${NC}"
 echo -e "${BOLD}       Starting Fusion ERP Unified Environment        ${NC}"
 echo -e "${BOLD}======================================================${NC}"
-echo -e "Token: ${GREEN}${TOKEN:0:15}...${NC}"
+echo -e "Token:              ${GREEN}${TOKEN:0:15}...${NC}"
 echo -e "IAM Backend:        ${CYAN}http://127.0.0.1:8001${NC}"
 echo -e "Integrated Backend: ${GREEN}http://127.0.0.1:8002${NC}"
 echo -e "Frontend Client:    ${YELLOW}http://127.0.0.1:5173${NC}"
@@ -53,6 +60,15 @@ if [ ! -f "$INTEGRATED_PY" ]; then
     exit 1
 fi
 
+# Clean up any leftover processes on the required ports
+for port in 8001 8002 5173; do
+    if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${YELLOW}Port $port is in use. Clearing lingering process...${NC}"
+        fuser -k "$port"/tcp 2>/dev/null || true
+        sleep 0.5
+    fi
+done
+
 # Cleanup handler on exit or Ctrl+C
 cleanup() {
     trap - SIGINT SIGTERM EXIT
@@ -73,9 +89,9 @@ cleanup() {
         kill "$PID_CLIENT" 2>/dev/null || true
     fi
 
-    # Extra check for any lingering Django runservers on 8001 / 8002
     fuser -k 8001/tcp 2>/dev/null || true
     fuser -k 8002/tcp 2>/dev/null || true
+    fuser -k 5173/tcp 2>/dev/null || true
 
     echo -e "${GREEN}All services successfully terminated.${NC}"
     exit 0
@@ -84,13 +100,26 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 # 1. Start IAM Backend
+echo -e "${CYAN}Starting IAM Backend on 127.0.0.1:8001...${NC}"
 (
     cd "$ADMIN_DIR"
+    export DEBUG="True"
+    export SECURE_SSL_REDIRECT="False"
     exec "$ADMIN_PY" manage.py runserver 127.0.0.1:8001 2>&1 | sed -u "s/^/$(printf "${CYAN}[IAM-8001]${NC} ")/"
 ) &
 PID_IAM=$!
 
+# Wait briefly for IAM backend to start listening on port 8001
+for i in {1..30}; do
+    if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo -e "${CYAN}IAM Backend is ready and listening on port 8001.${NC}"
+        break
+    fi
+    sleep 0.2
+done
+
 # 2. Start Fusion Integrated Backend
+echo -e "${GREEN}Starting Integrated Backend on 0.0.0.0:8002...${NC}"
 (
     cd "$INTEGRATED_DIR"
     exec "$INTEGRATED_PY" manage.py runserver 0.0.0.0:8002 2>&1 | sed -u "s/^/$(printf "${GREEN}[BACKEND-8002]${NC} ")/"
@@ -98,6 +127,7 @@ PID_IAM=$!
 PID_BACKEND=$!
 
 # 3. Start Frontend Client
+echo -e "${YELLOW}Starting Frontend Vite Client on port 5173...${NC}"
 (
     cd "$CLIENT_DIR"
     exec npm run dev 2>&1 | sed -u "s/^/$(printf "${YELLOW}[CLIENT-VITE]${NC} ")/"
