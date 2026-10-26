@@ -15,10 +15,6 @@ export PYTHONUNBUFFERED=1
 # Default service token if not already set in environment
 export TOKEN="${TOKEN:-fsvc_IokeDbMHN--rewd_g7gZPkLpD3MiwIZrPJsRKLR6jdY}"
 
-# Force DEBUG=True and SECURE_SSL_REDIRECT=False so local dev runs over plain HTTP without SSL redirects
-export DEBUG="True"
-export SECURE_SSL_REDIRECT="False"
-
 # Colors
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
@@ -63,7 +59,7 @@ fi
 # Clean up any leftover processes on the required ports
 for port in 8001 8002 5173; do
     if lsof -Pi :"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo -e "${YELLOW}Port $port is in use. Clearing lingering process...${NC}"
+        echo -e "${YELLOW}Port $port is currently in use. Clearing lingering process...${NC}"
         fuser -k "$port"/tcp 2>/dev/null || true
         sleep 0.5
     fi
@@ -99,29 +95,42 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# 1. Start IAM Backend
+# 1. Start IAM Backend (explicitly with backend.settings, DEBUG=True, and SECURE_SSL_REDIRECT=False)
 echo -e "${CYAN}Starting IAM Backend on 127.0.0.1:8001...${NC}"
 (
     cd "$ADMIN_DIR"
+    export DJANGO_SETTINGS_MODULE="backend.settings"
     export DEBUG="True"
     export SECURE_SSL_REDIRECT="False"
     exec "$ADMIN_PY" manage.py runserver 127.0.0.1:8001 2>&1 | sed -u "s/^/$(printf "${CYAN}[IAM-8001]${NC} ")/"
 ) &
 PID_IAM=$!
 
-# Wait briefly for IAM backend to start listening on port 8001
-for i in {1..30}; do
+# Wait for IAM backend to start listening on port 8001
+IAM_READY=0
+for i in {1..50}; do
+    if ! kill -0 "$PID_IAM" 2>/dev/null; then
+        echo -e "${RED}Error: IAM Backend process died prematurely! Check logs above.${NC}"
+        exit 1
+    fi
     if lsof -Pi :8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        IAM_READY=1
         echo -e "${CYAN}IAM Backend is ready and listening on port 8001.${NC}"
         break
     fi
     sleep 0.2
 done
 
+if [ "$IAM_READY" -ne 1 ]; then
+    echo -e "${RED}Error: IAM Backend timed out before opening port 8001.${NC}"
+    exit 1
+fi
+
 # 2. Start Fusion Integrated Backend
 echo -e "${GREEN}Starting Integrated Backend on 0.0.0.0:8002...${NC}"
 (
     cd "$INTEGRATED_DIR"
+    export DJANGO_SETTINGS_MODULE="config.settings.dev"
     exec "$INTEGRATED_PY" manage.py runserver 0.0.0.0:8002 2>&1 | sed -u "s/^/$(printf "${GREEN}[BACKEND-8002]${NC} ")/"
 ) &
 PID_BACKEND=$!
