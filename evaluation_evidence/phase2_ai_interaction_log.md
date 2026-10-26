@@ -91,3 +91,4 @@ Running the three services revealed two critical runtime bugs:
 **Changes Applied**:
 - Added `faculty` and `staff` role grants to `modules/elm/registry.py`.
 - Automated IAM permission syncing via `manage.py seed_iam_permissions --manifest ../registry/permissions.json` inside `run.sh` so every startup auto-provisions permissions.
+

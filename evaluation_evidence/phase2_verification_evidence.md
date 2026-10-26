@@ -100,3 +100,4 @@ dist/assets/index-B4xL9pQ.js    642.18 kB │ gzip: 182.11 kB
 - **Authentication**: Verified login with standard development accounts (`faculty_user`, `staff_user`).
 - **Sidebar Integration**: ELM appears in the navigation sidebar under "Employee Services" with links to "My Leaves", "Balances", "Approvals", and "Holiday Calendar".
 - **Database Status**: All migrations applied cleanly in Postgres without cross-database foreign key violations.
+
